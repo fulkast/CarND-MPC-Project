@@ -65,6 +65,42 @@ Eigen::VectorXd polyfit(Eigen::VectorXd xvals, Eigen::VectorXd yvals,
   return result;
 }
 
+Eigen::VectorXd polyfit(std::vector<double> xvals, std::vector<double> yvals,
+                        int order)
+{
+  Eigen::VectorXd ptsx(xvals.size());
+  Eigen::VectorXd ptsy(yvals.size());
+  assert(xvals.size() == yvals.size() && "polyfit xval yval not same size");
+  for (int i = 0; i < ptsx.size(); i++) {
+    ptsx(i) = xvals[i];
+    ptsy(i) = yvals[i];
+  }
+
+  return polyfit(ptsx, ptsy, order);
+}
+
+double evalPolynomialGradient(Eigen::VectorXd coeffs, double x) {
+  double result = 0.0;
+  for (int i = 1; i < coeffs.size(); i++) {
+    result += coeffs[i] * pow(x, i-1);
+  }
+  return result;
+}
+
+void mapToCarFrame(vector<double> car_state,
+                              vector<double> &ptsx, vector<double> &ptsy)
+{
+  for (int i = 0; i < ptsx.size(); i++) {
+    double x_diff, y_diff, car_theta;
+    car_theta = car_state[2];
+    x_diff = ptsx[i] - car_state[0];
+    y_diff = ptsy[i] - car_state[1];
+    ptsx[i] = cos(car_theta) * x_diff + sin(car_theta) * y_diff;
+    ptsy[i] = -sin(car_theta) * x_diff + cos(car_theta) * y_diff;
+  }
+}
+
+
 int main() {
   uWS::Hub h;
 
@@ -77,7 +113,7 @@ int main() {
     // The 4 signifies a websocket message
     // The 2 signifies a websocket event
     string sdata = string(data).substr(0, length);
-    cout << sdata << endl;
+    // cout << sdata << endl;
     if (sdata.size() > 2 && sdata[0] == '4' && sdata[1] == '2') {
       string s = hasData(sdata);
       if (s != "") {
@@ -90,7 +126,55 @@ int main() {
           double px = j[1]["x"];
           double py = j[1]["y"];
           double psi = j[1]["psi"];
+          psi = atan2f(sin(psi), cos(psi)); // unwrap 2pi
           double v = j[1]["speed"];
+
+          // find the appropriate fit order
+          int polyfit_order = 3;
+          polyfit_order = ptsx.size() < polyfit_order ?
+                                              ptsx.size()-1 : polyfit_order;
+
+          // transform to car frame before fitting a polynomial.
+          mapToCarFrame({px,py,psi}, ptsx, ptsy);
+          // prune points behind the car
+          // std::cout << "ptsx size before pruning " << ptsx.size() << std::endl;
+          // while (ptsx[0] < 0) {
+          //   ptsx.erase(ptsx.begin());
+          //   ptsy.erase(ptsy.begin());
+          // }
+          // std::cout << "ptsx size after pruning " << ptsx.size() << std::endl;
+
+          px = py = psi = 0;
+
+          auto coeffs = polyfit(ptsx, ptsy, polyfit_order);
+
+          // calculate the cross track error
+          double y_ref = polyeval(coeffs, px);
+          double cte = py - y_ref;
+          // calculate the orientation error
+          double desired_heading = atanf(evalPolynomialGradient(coeffs, px));
+          double local_x_diff = ptsx[1] - ptsx[0];
+          double local_y_diff = ptsy[1] - ptsy[0];
+          if (local_x_diff * cos(desired_heading) +
+                                      local_y_diff * sin(desired_heading) < 0) // correct for the gradient being 180 degree resolution
+          {
+            double x = cos(desired_heading);
+            double y = sin(desired_heading);
+            x *= -1;
+            y *= -1;
+            desired_heading = atan2f(y,x);
+          }
+
+          double psi_ref = desired_heading;
+          double epsi = psi - psi_ref ;
+          epsi = atan2f(sin(epsi), cos(epsi));
+
+          // get the current state
+          Eigen::VectorXd state(6);
+          state << px, py, psi, v, cte, epsi;
+
+          std::cout << "initializing to x, y, psi, v, cte, epsi " << px << " " << py<<
+          " " << psi<< " " << v<< " " << cte<< " " << epsi << std::endl;
 
           /*
           * TODO: Calculate steering angle and throttle using MPC.
@@ -98,8 +182,53 @@ int main() {
           * Both are in between [-1, 1].
           *
           */
-          double steer_value;
-          double throttle_value;
+          std::vector<double> x_vals = {state[0]};
+          std::vector<double> y_vals = {state[1]};
+          std::vector<double> psi_vals = {state[2]};
+          std::vector<double> v_vals = {state[3]};
+          std::vector<double> cte_vals = {state[4]};
+          std::vector<double> epsi_vals = {state[5]};
+          std::vector<double> delta_vals = {};
+          std::vector<double> a_vals = {};
+
+          auto vars = mpc.Solve(state, coeffs);
+
+          const int N = 10;
+          const int x_start = 0;
+          const int y_start = x_start+N;
+          const int psi_start = y_start+N;
+          const int v_start = psi_start+N;
+          const int cte_start = v_start+N;
+          const int epsi_start = cte_start+N;
+          const int delta_start = epsi_start + N;
+          const int a_start = delta_start + N - 1;
+
+          x_vals.push_back(vars[x_start]);
+          y_vals.push_back(vars[y_start]);
+          psi_vals.push_back(vars[psi_start]);
+          v_vals.push_back(vars[v_start]);
+          cte_vals.push_back(vars[cte_start]);
+          epsi_vals.push_back(vars[epsi_start]);
+
+          delta_vals.push_back(vars[delta_start]);
+          a_vals.push_back(vars[a_start]);
+
+          state << vars[x_start], vars[y_start], vars[psi_start], vars[v_start],
+                        vars[cte_start], vars[epsi_start];
+          // std::cout << "x = " << state[0] << std::endl;
+          // std::cout << "y = " << state[1] << std::endl;
+          // std::cout << "psi = " << state[2] << std::endl;
+          // std::cout << "v = " << state[3] << std::endl;
+          // std::cout << "cte = " << state[4] << std::endl;
+          // std::cout << "epsi = " << state[5] << std::endl;
+          // std::cout << "delta = " << vars[delta_start] << std::endl;
+          // std::cout << "a = " << vars[a_start] << std::endl;
+          // std::cout << std::endl;
+
+          double steer_value = vars[delta_start];
+          double throttle_value = vars[a_start];
+
+          steer_value /= -deg2rad(25);
 
           json msgJson;
           // NOTE: Remember to divide by deg2rad(25) before you send the steering value back.
@@ -107,9 +236,17 @@ int main() {
           msgJson["steering_angle"] = steer_value;
           msgJson["throttle"] = throttle_value;
 
-          //Display the MPC predicted trajectory 
+          //Display the MPC predicted trajectory
           vector<double> mpc_x_vals;
           vector<double> mpc_y_vals;
+          for (int i = 0; i < N; i++) {
+            mpc_x_vals.push_back(vars[x_start+i]);
+            mpc_y_vals.push_back(vars[y_start+i]);
+          }
+          // mpc_x_vals = ptsx;
+          // for (int i = 0; i < ptsx.size(); i++) {
+          //   mpc_y_vals.push_back(polyeval(coeffs, ptsx[i]));
+          // }
 
           //.. add (x,y) points to list here, points are in reference to the vehicle's coordinate system
           // the points in the simulator are connected by a Green line
@@ -123,6 +260,8 @@ int main() {
 
           //.. add (x,y) points to list here, points are in reference to the vehicle's coordinate system
           // the points in the simulator are connected by a Yellow line
+          next_x_vals = ptsx;
+          next_y_vals = ptsy;
 
           msgJson["next_x"] = next_x_vals;
           msgJson["next_y"] = next_y_vals;
@@ -139,7 +278,7 @@ int main() {
           //
           // NOTE: REMEMBER TO SET THIS TO 100 MILLISECONDS BEFORE
           // SUBMITTING.
-          this_thread::sleep_for(chrono::milliseconds(100));
+          this_thread::sleep_for(chrono::milliseconds(0));
           ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
         }
       } else {
