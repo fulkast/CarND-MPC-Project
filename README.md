@@ -14,11 +14,21 @@ of the acceleration `a` and the heading `psi` is updated by integrating the angu
 induced by the front axle of the vehicle moving at speed `v` at an angle `delta` from the longitudinal direction,
 with a moment arm of `Lf` from the center of mass of the car.
 
+Mathematically, we state that:
+x(t+1) = x(t) + delta_t * cos(psi(t)) v(t)
+y(t+1) = y(t) + delta_t * sin(psi(t)) v(t)
+v(t+1) = v(t) + delta_t * a(t)
+psi(t+1) = psi(t) + delta_t * v(t) / Lf * delta(t)
+
 ## The Time Horizon Choice
 The time horizon, `N`, of value 10 was chosen because on my local machine it runs without a considerable lag
 (This wasn't the case when N was set to 50). Given the reference speed of 40mph and the time horizon of 10 steps, a reasonable time step
 length of 0.1 seconds was chosen. At higher values, e.g. 0.5 when the MPC controller had to predict long trajectories, the controller did not
-consistently return a valid trajectory. 
+consistently return a valid trajectory.
+
+## Waypoint Following
+The waypoints in the global map coordinates are transformed into the vehicle's coordinates.
+Thereafter, the trajectory is approximated by a third order polynomial(or lower depending on the number of waypoints). 
 
 ---
 

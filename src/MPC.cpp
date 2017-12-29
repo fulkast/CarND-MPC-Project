@@ -20,7 +20,7 @@ double dt = .1;
 //
 // This is the length from front to CoG that has a similar radius.
 const double Lf = 2.67;
-const double ref_v = 40;
+const double ref_v = 40 * 0.44704; // 40mph in m/s
 
 const int x_start = 0;
 const int y_start = x_start+N;
@@ -37,6 +37,14 @@ class FG_eval {
     AD<double> result = 0.0;
     for (int i = 0; i < coeffs.size(); i++) {
       result += coeffs[i] * CppAD::pow(x, i);
+    }
+    return result;
+  }
+
+  AD<double> evalPolynomialGradient(Eigen::VectorXd coeffs, AD<double> x) {
+    AD<double> result = 0.0;
+    for (int i = 1; i < coeffs.size(); i++) {
+      result += coeffs[i] * pow(x, i-1);
     }
     return result;
   }
@@ -117,7 +125,7 @@ class FG_eval {
       AD<double> a0 = vars[a_start + t - 1];
 
       AD<double> f0 = polyeval(coeffs, x0);//  coeffs[0] + coeffs[1] * x0;
-      AD<double> psides0 = CppAD::atan(coeffs[1]);
+      AD<double> psides0 = evalPolynomialGradient(coeffs, x0);
 
       fg[1 + x_start + t] = x1 - (x0 + v0 * CppAD::cos(psi0) * dt);
       fg[1 + y_start + t] = y1 - (y0 + v0 * CppAD::sin(psi0) * dt);

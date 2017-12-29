@@ -12,6 +12,8 @@
 // for convenience
 using json = nlohmann::json;
 
+const double Lf = 2.67;
+
 // For converting back and forth between radians and degrees.
 constexpr double pi() { return M_PI; }
 double deg2rad(double x) { return x * pi() / 180; }
@@ -146,21 +148,22 @@ int main() {
           double cte = py - y_ref;
           // calculate the orientation error
           double desired_heading = atanf(evalPolynomialGradient(coeffs, px));
-          double local_x_diff = ptsx[1] - ptsx[0];
-          double local_y_diff = ptsy[1] - ptsy[0];
-          if (local_x_diff * cos(desired_heading) +
-                                      local_y_diff * sin(desired_heading) < 0) // correct for the gradient being 180 degree resolution
-          {
-            double x = cos(desired_heading);
-            double y = sin(desired_heading);
-            x *= -1;
-            y *= -1;
-            desired_heading = atan2f(y,x);
-          }
+          double epsi = psi - desired_heading;
 
-          double psi_ref = desired_heading;
-          double epsi = psi - psi_ref ;
-          epsi = atan2f(sin(epsi), cos(epsi));
+          double latency = 0.1;
+          double delta = j[1]["steering_angle"];
+          delta *= -1;
+          double a =  j[1]["throttle"];
+
+          //to convert miles per hour to meter per second
+          v *= 0.44704;
+          psi = delta; // in coordinate now, so use steering angle to predict x and y
+          px = px + v*cos(psi)*latency;
+          py = py + v*sin(psi)*latency;
+          cte= cte + v*sin(epsi)*latency;
+          epsi = epsi + v*delta*latency/Lf;
+          psi = psi + v*delta*latency/Lf;
+          v = v + a*latency;
 
           // get the current state
           Eigen::VectorXd state(6);
