@@ -157,12 +157,11 @@ int main() {
 
           //to convert miles per hour to meter per second
           v *= 0.44704;
-          psi = delta; // in coordinate now, so use steering angle to predict x and y
           px = px + v*cos(psi)*latency;
           py = py + v*sin(psi)*latency;
           cte= cte + v*sin(epsi)*latency;
-          epsi = epsi + v*delta*latency/Lf;
-          psi = psi + v*delta*latency/Lf;
+          epsi = epsi + v*delta*latency/Lf; // account for the delay
+          psi = psi + v*delta*latency/Lf;   // account for the delay
           v = v + a*latency;
 
           // get the current state

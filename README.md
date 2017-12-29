@@ -28,7 +28,19 @@ consistently return a valid trajectory.
 
 ## Waypoint Following
 The waypoints in the global map coordinates are transformed into the vehicle's coordinates.
-Thereafter, the trajectory is approximated by a third order polynomial(or lower depending on the number of waypoints). 
+Thereafter, the trajectory is approximated by a third order polynomial(or lower depending on the number of waypoints).
+
+## Accounting for Actuator Latency
+In reality, the desired actuations output by the MPC controller is not enforced instantaneously. In this project, it is assumed that
+it takes 0.1 seconds before the vehicle reaches the desired setpoint steering angle and throttle acceleration. To account for this artifact,
+the initial state of the vehicle at the first time horizon, is projected forward by the delay of 0.1 seconds. Since in the vehicle frame, the car's position and orientation is given by the identity affine transformation, the resultant drift due to the time delay is given by the following.
+
+x(0) = 0 + delay * cos(psi(0)) v(0)
+y(0) = 0 + delay * sin(psi(0)) v(0)
+v(0) = v(0) + delay * a(0)
+psi(0) = 0 + delay * v(0) / Lf * delta(0)
+
+Note that `psi(0) = 0`
 
 ---
 
