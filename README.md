@@ -1,6 +1,25 @@
 # CarND-Controls-MPC
 Self-Driving Car Engineer Nanodegree Program
 
+## The Car Model
+The bicycle model is implemented in this project to approximate the dynamics of
+the vehicle, given its simplicity. The relevant states are the `x`,`y` position
+of the vehicle, its heading `psi` and longitudinal velocity magnitude `v`. The actuations
+of the vehicle are represented by the acceleration `a`, which is the first derivative
+of the velocity `v`, and `delta`, the steering angle of the car.
+
+The position update of the vehicle is given by the discretized integral of an object
+moving at speed `v` in the heading `psi`. The speed `v` is updated by the discretized integral
+of the acceleration `a` and the heading `psi` is updated by integrating the angular rotation rate
+induced by the front axle of the vehicle moving at speed `v` at an angle `delta` from the longitudinal direction,
+with a moment arm of `Lf` from the center of mass of the car.
+
+## The Time Horizon Choice
+The time horizon, `N`, of value 10 was chosen because on my local machine it runs without a considerable lag
+(This wasn't the case when N was set to 50). Given the reference speed of 40mph and the time horizon of 10 steps, a reasonable time step
+length of 0.1 seconds was chosen. At higher values, e.g. 0.5 when the MPC controller had to predict long trajectories, the controller did not
+consistently return a valid trajectory. 
+
 ---
 
 ## Dependencies
