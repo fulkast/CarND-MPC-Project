@@ -136,13 +136,6 @@ int main() {
 
           // transform to car frame before fitting a polynomial.
           mapToCarFrame({px,py,psi}, ptsx, ptsy);
-          // prune points behind the car
-          // std::cout << "ptsx size before pruning " << ptsx.size() << std::endl;
-          // while (ptsx[0] < 0) {
-          //   ptsx.erase(ptsx.begin());
-          //   ptsy.erase(ptsy.begin());
-          // }
-          // std::cout << "ptsx size after pruning " << ptsx.size() << std::endl;
 
           px = py = psi = 0;
 
@@ -173,11 +166,8 @@ int main() {
           Eigen::VectorXd state(6);
           state << px, py, psi, v, cte, epsi;
 
-          std::cout << "initializing to x, y, psi, v, cte, epsi " << px << " " << py<<
-          " " << psi<< " " << v<< " " << cte<< " " << epsi << std::endl;
-
           /*
-          * TODO: Calculate steering angle and throttle using MPC.
+          * Calculate steering angle and throttle using MPC.
           *
           * Both are in between [-1, 1].
           *
@@ -215,15 +205,6 @@ int main() {
 
           state << vars[x_start], vars[y_start], vars[psi_start], vars[v_start],
                         vars[cte_start], vars[epsi_start];
-          // std::cout << "x = " << state[0] << std::endl;
-          // std::cout << "y = " << state[1] << std::endl;
-          // std::cout << "psi = " << state[2] << std::endl;
-          // std::cout << "v = " << state[3] << std::endl;
-          // std::cout << "cte = " << state[4] << std::endl;
-          // std::cout << "epsi = " << state[5] << std::endl;
-          // std::cout << "delta = " << vars[delta_start] << std::endl;
-          // std::cout << "a = " << vars[a_start] << std::endl;
-          // std::cout << std::endl;
 
           double steer_value = vars[delta_start];
           double throttle_value = vars[a_start];
